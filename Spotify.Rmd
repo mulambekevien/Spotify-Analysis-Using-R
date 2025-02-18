@@ -1,0 +1,225 @@
+---
+title: "Spotify"
+author: "User"
+date: "2024-11-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Lets begin by loading the required packages
+```{r}
+pacman::p_load(ggplot2, plotly, readxl, lubridate, janitor, dplyr, tidyverse)
+```
+
+## lets load the dataset
+```{r}
+Spotify= read.csv("Spotify_Youtube.csv")
+```
+
+## Lets view the first 5 rows of the dataset
+```{r}
+head(Spotify, 5)
+```
+
+## Data Cleaning
+### Lets check the columns with missing values
+```{r}
+NAs = colSums(is.na(Spotify))
+print(NAs)
+names(Spotify)[NAs>1]
+```
+
+### Lets remove the missing value
+```{r}
+Spotify = Spotify |> filter(!is.na(Spotify$Stream))
+Spotify = Spotify |> filter(!is.na(Spotify$Comments))
+Spotify = Spotify |>  filter(!is.na(Spotify$Likes))
+Spotify = Spotify |> filter(!is.na(Spotify$Danceability))
+```
+
+### lets check the dimension of the remaining dataset
+```{r}
+dim(Spotify)
+```
+
+### Lets get an overview of the dataset
+```{r}
+str(Spotify)
+```
+
+### Lets change the datatypes of some columns
+```{r}
+Spotify$Album_type = as.factor(Spotify$Album_type)
+Spotify$Licensed = as.factor(Spotify$Licensed)
+Spotify$official_video = as.factor(Spotify$official_video)
+```
+
+### Lets get a structure of the dataset
+```{r}
+summary(Spotify)
+```
+
+## Visualizations
+```{r}
+colors = c("blue","green","pink", "gray", "black", "purple", "violet", "red","yellow","brown")
+```
+### Lets get the most streamed music plus the name of the artist
+```{r}
+### getting the top 10 Artist and Track streamed
+Most_Streamed = Spotify |>  
+  select(Artist, Stream) |>  
+  group_by(Artist) |>
+  summarise(Total_streams = round((sum(Stream)/1000000000), 2), .groups="drop") |> 
+  arrange(desc(Total_streams)) |> 
+  head(10)
+
+### Stacked bar plot
+plot_ly(
+  data = Most_Streamed,
+  x = ~Artist,
+  y = ~Total_streams,
+  type = 'bar',
+  marker = list(color =colors),
+  text = ~paste0(Total_streams, " Billion"),
+  textposition = "inside"
+) |> 
+  layout(
+    title = "Top 10 Most Streamed Artists",
+    xaxis = list(title = "Artist"),
+    yaxis = list(title = "Streams(In Billions)", range=c(8, max(Most_Streamed$Total_streams)))
+  )
+```
+
+### Most Streamed Channel
+```{r}
+Most_Streamed_Channel = Spotify |> 
+  select(Channel, Stream) |> 
+  group_by(Channel) |> 
+  summarise(Total_Streamers = round(sum(Stream)/1000000000), 2) |> 
+  arrange(desc(Total_Streamers)) |> 
+  head(10)
+
+#Stacked bar plot
+plot_ly(data = Most_Streamed_Channel,
+        x= ~ Channel,
+        y= ~Total_Streamers,
+        type ="bar", 
+        marker = list(color =colors),
+        text = ~paste0(Total_Streamers, " Billion"),
+        textposition = "inside"
+) |> 
+  layout(
+    title = "Top 10 Most Streamed Channels",
+    xaxis = list(title = "Channels"),
+    yaxis = list(title = "Streams(In Billions)", range= c(13, max(Most_Streamed_Channel$Total_Streamers)))
+  )
+```
+
+## Most produced Album Type
+```{r}
+Most_produced_Album_Type = Spotify |> 
+  select(Album_type) |> 
+  group_by(Album_type) |> 
+  summarise(Total_count = n())
+
+plot_ly(data = Most_produced_Album_Type,
+        values = ~Total_count,
+        labels = ~Album_type,
+        type = "pie",
+        marker = list(color=colors)) |> 
+  layout(
+    title="Most Produced Album Type"
+  )
+
+```
+
+## Track with the most Views, Likes, Comments and Streams,
+```{r}
+Best_Track = Spotify |> 
+  select(Track, Views, Comments, Stream) |> 
+  group_by(Track) |> 
+  arrange(desc(Views), desc(Stream), desc(Comments)) |> 
+  head(10)
+
+print(Best_Track)
+
+```
+
+## Relationship between Licence, Views, Likes and Streams
+```{r}
+License_Best = Spotify |> 
+  select(Licensed, Views, Likes, Stream) |> 
+  group_by(Licensed) |> 
+  summarise(Total_Views = round(sum(Views)/1000000,2), Total_Likes = round(sum(Likes)/1000000,2), Total_Streams = round(sum(Stream)/1000000, 2))
+
+License_Best_Long = License_Best |> 
+  pivot_longer(cols = c("Total_Views","Total_Likes","Total_Streams"),
+               names_to = "Popularity",
+               values_to = "Totals")
+
+plot_ly(data = License_Best_Long,
+        x= ~ Popularity,
+        y= ~ Totals,
+        color = ~Licensed,
+        type = "bar",
+        text = ~paste0(Totals, " Billions"),
+        textposition = "inside"
+) |> 
+  layout(
+    title = "Relationship Between License, Likes, Comments and Streams",
+    xaxis = list(title = "Popularity"),
+    yaxis = list(title = "Total in Billions)")
+  )
+```
+
+## Relationship between official Video, Views, Likes and Streams
+```{r}
+official_video_Best = Spotify |> 
+  select(official_video, Views, Likes, Stream) |> 
+  group_by(official_video) |> 
+  summarise(Total_Views = round(sum(Views)/1000000,2), Total_Likes = round(sum(Likes)/1000000,2), Total_Streams = round(sum(Stream)/1000000, 2))
+
+official_Best_Long = official_video_Best |> 
+  pivot_longer(cols = c("Total_Views","Total_Likes","Total_Streams"),
+               names_to = "Popularity",
+               values_to = "Totals")
+
+plot_ly(data = official_Best_Long,
+        x= ~ Totals,
+        y= ~ Popularity,
+        color = ~official_video,
+        type = "bar",
+        text = ~paste0(Totals, " Billions"),
+        textposition = "inside"
+) |> 
+  layout(
+    title = "Relationship Between Official Video, Views, Likes and Streams",
+    xaxis = list(title = "Total in Billions"),
+    yaxis = list(title = "Popularity")
+  )
+```
+
+## A Heatmap to check the correlation between Views, Likes, Streams and Comments
+```{r}
+#Lets extract the columns we need
+Spotify_subset <- Spotify |> 
+  select(Danceability, Energy, Key, Loudness, Speechiness, Acousticness, Instrumentalness, Liveness, Valence,Tempo, Duration_ms, Views, Likes, Comments, Stream) |> 
+  cor()
+
+# Heatmap
+plot_ly(
+  x = colnames(Spotify_subset), 
+  y = rownames(Spotify_subset), 
+  z = Spotify_subset, 
+  type = "heatmap", 
+  colors = c("blue", "white", "red")
+) |> 
+  layout(
+    title = "Correlation Heatmap",
+    xaxis = list(title = "Variables"),
+    yaxis = list(title = "Variables")
+  )
+```
